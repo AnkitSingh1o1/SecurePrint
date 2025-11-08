@@ -1,6 +1,9 @@
 import { v4 as uuidv4 } from 'uuid';
 import { FileRepository } from '../repositories/fileRepo';
 import { AppError } from '../utils/errorHandler';
+import { PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { s3Client, S3_BUCKET_NAME } from "../utils/s3Client";
 import fs from 'fs';
 import path from 'path';
 import { FileRecord } from '../models/file';
@@ -8,7 +11,7 @@ import mime from 'mime';
 
 export class FileService {
   private static instance: FileService;
-  private fileRepo: FileRepository;
+  private readonly fileRepo: FileRepository;
 
   private constructor() {
     this.fileRepo = FileRepository.getInstance();
@@ -41,6 +44,57 @@ export class FileService {
     });
   }
 
+  /**
+   * Upload files to S3 and save metadata in repository
+   */
+async uploadFiles(files: Express.Multer.File[]): Promise<FileRecord[]> {
+  if (!files || files.length === 0) throw new AppError("No files uploaded", 400);
+
+  const savedFiles: FileRecord[] = [];
+
+  for (const file of files) {
+    //Safely handle undefined file names or extensions
+    const extension = file.originalname?.includes(".")
+      ? file.originalname.split(".").pop()
+      : "";
+
+    //Use mime-types lookup safely, fallback to file.mimetype or default
+    const mimeType =
+      (extension && mime.lookup(extension)) ||
+      file.mimetype ||
+      "application/octet-stream";
+
+    //Safe S3 key generation
+    const s3Key = `${uuidv4()}-${file.originalname || "unnamed-file"}`;
+
+    //Upload to S3
+    await s3Client.send(
+      new PutObjectCommand({
+        Bucket: process.env.AWS_BUCKET_NAME,
+        Key: s3Key,
+        Body: file.buffer,
+        ContentType: mimeType,
+      })
+    );
+
+    const record: FileRecord = {
+      id: uuidv4(),
+      originalName: file.originalname || "unknown",
+      mimeType,
+      size: file.size || 0,
+      s3Key,
+      uploadedAt: new Date(),
+    };
+
+    this.fileRepo.saveFile(record);
+    savedFiles.push(record);
+  }
+
+  return savedFiles;
+}
+
+
+
   public getAllFiles() {
     return this.fileRepo.getAllFiles();
   }
@@ -51,9 +105,25 @@ export class FileService {
       throw new AppError('File not found', 404);
     }
 
+    if (!file.path) {
+      throw new AppError('File path is undefined', 500);
+    }
     const filePath = path.resolve(file.path);
     const readStream = fs.createReadStream(filePath);
     res.setHeader('Content-Type', file.mimeType);
     readStream.pipe(res);
+  }
+
+  async generateShareLink(fileId: string, expiresInSec = 600) {
+    const file = this.fileRepo.getFileById(fileId);
+    if (!file) throw new AppError("File not found", 404);
+
+    const command = new GetObjectCommand({
+      Bucket: S3_BUCKET_NAME,
+      Key: file.s3Key!,
+    });
+
+    const url = await getSignedUrl(s3Client, command, { expiresIn: expiresInSec });
+    return url;
   }
 }

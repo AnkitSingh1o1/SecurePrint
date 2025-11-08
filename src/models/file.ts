@@ -3,6 +3,7 @@ export interface FileRecord {
   originalName: string;
   mimeType: string;
   size: number;
-  path: string;
+  path?: string;
+  s3Key?: string;
   uploadedAt: Date;
 }
