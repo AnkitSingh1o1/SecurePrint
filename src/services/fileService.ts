@@ -8,6 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import { FileRecord } from '../models/file';
 import mime from 'mime';
+import { UploadedFile } from "express-fileupload";
 
 export class FileService {
   private static instance: FileService;
@@ -47,15 +48,17 @@ export class FileService {
   /**
    * Upload files to S3 and save metadata in repository
    */
-async uploadFiles(files: Express.Multer.File[]): Promise<FileRecord[]> {
+async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
   if (!files || files.length === 0) throw new AppError("No files uploaded", 400);
 
   const savedFiles: FileRecord[] = [];
 
   for (const file of files) {
+    //express-fileupload uses `file.name`, not `file.originalname`
+    const originalName = file.name || "unknown.pdf";
     //Safely handle undefined file names or extensions
-    const extension = file.originalname?.includes(".")
-      ? file.originalname.split(".").pop()
+    const extension = originalName?.includes(".")
+      ? originalName.split(".").pop()
       : "";
 
     //Use mime-types lookup safely, fallback to file.mimetype or default
@@ -65,26 +68,26 @@ async uploadFiles(files: Express.Multer.File[]): Promise<FileRecord[]> {
       "application/octet-stream";
 
     //Safe S3 key generation
-    const s3Key = `${uuidv4()}-${file.originalname || "unnamed-file"}`;
+    const s3Key = `${uuidv4()}-${originalName}`;
 
     //Upload to S3
     await s3Client.send(
-      new PutObjectCommand({
-        Bucket: process.env.AWS_BUCKET_NAME,
-        Key: s3Key,
-        Body: file.buffer,
-        ContentType: mimeType,
-      })
-    );
+        new PutObjectCommand({
+          Bucket: process.env.AWS_BUCKET_NAME,
+          Key: s3Key,
+          Body: file.data, // express-fileupload provides Buffer here
+          ContentType: mimeType,
+        })
+      );
 
     const record: FileRecord = {
-      id: uuidv4(),
-      originalName: file.originalname || "unknown",
-      mimeType,
-      size: file.size || 0,
-      s3Key,
-      uploadedAt: new Date(),
-    };
+        id: uuidv4(),
+        originalName,
+        mimeType,
+        size: file.size || 0,
+        s3Key,
+        uploadedAt: new Date(),
+      };
 
     this.fileRepo.saveFile(record);
     savedFiles.push(record);
