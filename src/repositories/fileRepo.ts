@@ -25,4 +25,13 @@ export class FileRepository {
   public getFileById(id: string) {
     return this.files.find((f) => f.id === id);
   }
+
+  public deleteFileById(id: string) {
+  const index = this.files.findIndex(f => f.id === id);
+  if (index !== -1) {
+    const deleted = this.files.splice(index, 1);
+    return deleted[0];
+  }
+  return null;
+}
 }

@@ -159,4 +159,26 @@ public async uploadFiles(req: Request, res: Response) {
     return res.status(500).json({ success: false, message: err.message });
   }
 }
+
+public async deleteFile(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+
+    const result = await fileService.deleteFile(id);
+
+    if (!result.success) {
+      return res.status(404).json({ success: false, message: result.message });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "File deleted successfully"
+    });
+
+  } catch (err: any) {
+    console.error("deleteFile error:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+}
+
 }

@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { FileRepository } from '../repositories/fileRepo';
 import { AppError } from '../utils/errorHandler';
-import { PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { s3Client, S3_BUCKET_NAME } from "../utils/s3Client";
 import fs from 'node:fs';
@@ -263,4 +263,25 @@ async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
 
         return { valid: true, fileId: record.fileId };
     }
+
+    public async deleteFile(id: string) {
+  // Check from metadata
+  const file = this.fileRepo.getFileById(id);
+  if (!file) {
+    return { success: false, message: "File not found" };
+  }
+
+  // 1. Delete from S3
+  await s3Client.send(
+    new DeleteObjectCommand({
+      Bucket: process.env.AWS_BUCKET_NAME!,
+      Key: file.s3Key,
+    })
+  );
+
+  // 2. Remove metadata
+  this.fileRepo.deleteFileById(id);
+
+  return { success: true, message: "File deleted successfully" };
+}
 }
