@@ -80,4 +80,31 @@ public async uploadFiles(req: Request, res: Response) {
       return res.status(500).json({ success: false, message: err.message });
     }
   }
+
+  public async previewFile(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const result = await fileService.getWatermarkedPdfStream(id);
+      if (!result) {
+        return res.status(404).json({
+          success: false,
+          message: "File not found or not a PDF",
+        });
+      }
+      res.setHeader("Content-Type", result.contentType);
+      res.setHeader(
+        "Content-Disposition",
+        `inline; filename="${encodeURIComponent(result.fileName)}"`
+      );
+      res.setHeader("Cache-Control", "no-store");
+
+      result.stream.pipe(res);
+    } catch (err: any) {
+      console.error("previewFile error:", err);
+      return res.status(500).json({
+        success: false,
+        message: err.message,
+      });
+    }
+  }
 }

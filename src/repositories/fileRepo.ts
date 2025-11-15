@@ -2,7 +2,7 @@ import { FileRecord } from "../models/file";
 
 export class FileRepository {
   private static instance: FileRepository;
-  private files: FileRecord[] = [];
+  private readonly files: FileRecord[] = [];
 
   private constructor() {}
 

@@ -9,6 +9,6 @@ router.post('/upload', fileController.uploadFiles);
 router.get('/', fileController.listFiles);
 router.get('/:id/stream', fileController.streamFile);
 router.get("/:id/share", fileController.generateShareLink);
-
+router.get("/:id/preview", fileController.previewFile);
 
 export default router;
