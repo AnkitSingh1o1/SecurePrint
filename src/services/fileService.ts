@@ -129,4 +129,34 @@ async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
     const url = await getSignedUrl(s3Client, command, { expiresIn: expiresInSec });
     return url;
   }
+
+    //Stream file directly from S3
+  async streamFileFromS3(id: string) {
+    const file = this.fileRepo.getFileById(id);
+    if (!file) return null;
+
+    const command = new GetObjectCommand({
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: file.s3Key,
+    });
+
+    const response = await s3Client.send(command);
+    return {
+    Body: response.Body,
+    ContentType: response.ContentType,
+    FileName: file.originalName,
+  };  
+}
+
+  async generateSignedUrl(id: string) {
+    const file = this.fileRepo.getFileById(id);
+    if (!file) return null;
+
+    const command = new GetObjectCommand({
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: file.s3Key,
+    });
+
+    return await getSignedUrl(s3Client, command, { expiresIn: 300 }); // 5 min
+  }
 }

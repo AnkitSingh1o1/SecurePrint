@@ -3,6 +3,8 @@ import { FileService } from '../services/fileService';
 import { handleError } from '../utils/errorHandler';
 import { successResponse } from '../utils/apiResponse';
 import multer from "multer";
+import { Readable } from "stream";
+import { toNodeReadable } from '../utils/streamUtils';
 
 const upload = multer({ storage: multer.memoryStorage() });
 const fileService = FileService.getInstance();
@@ -45,19 +47,37 @@ public async uploadFiles(req: Request, res: Response) {
   public async streamFile(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      fileService.streamFile(id, res);
-    } catch (err) {
-      handleError(err, res);
+      const stream = await fileService.streamFileFromS3(id);
+      if (!stream || !stream.Body) {
+        return res.status(404).json({
+          success: false,
+          message: "File not found or could not be streamed",
+        });
+      }
+    const nodeStream = await toNodeReadable(stream.Body);
+    res.setHeader("Content-Type", stream.ContentType || "application/octet-stream");
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename="${stream.FileName || "file"}"`
+    );
+    nodeStream.pipe(res);
+    } catch (err: any) {
+      console.error("Stream error:", err);
+      return res.status(500).json({ success: false, message: err.message });
     }
   }
 
   public async generateShareLink(req: Request, res: Response){
     try {
       const { id } = req.params;
-      const url = await fileService.generateShareLink(id);
-      return successResponse({ url }, "Shareable link generated");
-    } catch (err) {
-      handleError(err, res)
+      const signedUrl = await fileService.generateSignedUrl(id);
+      if (!signedUrl) {
+        return res.status(404).json({ success: false, message: "File not found" });
+      }
+      return res.status(200).json({ success: true, url: signedUrl });
+    } catch (err: any) {
+      console.error("Share link error:", err);
+      return res.status(500).json({ success: false, message: err.message });
     }
-  };
+  }
 }
