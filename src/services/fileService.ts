@@ -4,21 +4,24 @@ import { AppError } from '../utils/errorHandler';
 import { PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { s3Client, S3_BUCKET_NAME } from "../utils/s3Client";
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 import { FileRecord } from '../models/file';
 import mime from 'mime';
 import { UploadedFile } from "express-fileupload";
 import { PDFDocument, StandardFonts, rgb, degrees } from "pdf-lib";
-import { Readable } from "stream";
+import { Readable } from "node:stream";
 import { bodyToBuffer } from '../utils/streamUtils';
+import { TokenRepository } from '../repositories/tokenRepo';
 
 export class FileService {
   private static instance: FileService;
   private readonly fileRepo: FileRepository;
+  private readonly tokenRepo: TokenRepository;
 
   private constructor() {
     this.fileRepo = FileRepository.getInstance();
+    this.tokenRepo = TokenRepository.getInstance();
   }
 
   public static getInstance(): FileService {
@@ -222,4 +225,42 @@ async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
       fileName: file.originalName,
     };
   }
+
+  public async generateOneTimeAccessLink(fileId: string) {
+        const file = this.fileRepo.getFileById(fileId);
+        if (!file) return null;
+
+        const token = uuidv4();
+        const createdAt = new Date();
+        const expiresAt = new Date(createdAt.getTime() + 10 * 60 * 1000); // 10 minutes
+
+        this.tokenRepo.saveToken({
+            token,
+            fileId,
+            createdAt: createdAt.toISOString(),
+            expiresAt: expiresAt.toISOString(),
+            used: false
+        });
+
+        return `${process.env.BASE_URL || "http://localhost:4000"}/api/files/view/${token}`;
+    }
+
+    public async consumeOneTimeToken(token: string) {
+        const record = this.tokenRepo.getToken(token);
+        if (!record) return { valid: false, reason: "Invalid token" };
+
+        if (record.used) {
+            return { valid: false, reason: "Token already used" };
+        }
+
+        const now = new Date();
+        if (now > new Date(record.expiresAt)) {
+            return { valid: false, reason: "Token expired" };
+        }
+
+        // Valid token → mark used
+        this.tokenRepo.markUsed(token);
+
+        return { valid: true, fileId: record.fileId };
+    }
 }

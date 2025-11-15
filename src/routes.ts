@@ -10,5 +10,7 @@ router.get('/', fileController.listFiles);
 router.get('/:id/stream', fileController.streamFile);
 router.get("/:id/share", fileController.generateShareLink);
 router.get("/:id/preview", fileController.previewFile);
+router.get("/:id/access", fileController.generateAccessLink);
+router.get("/view/:token", fileController.viewUsingToken);
 
 export default router;
