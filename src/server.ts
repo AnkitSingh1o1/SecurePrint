@@ -5,9 +5,13 @@ import fileUpload from "express-fileupload";
 import fileRoutes from "./routes";
 import { connectDB } from "./configs/dbConfig";
 import { testRedisConnection } from "./configs/redisClient";
+import cors from "cors";
+import rateLimit from "express-rate-limit";
 
 connectDB(); 
-
+const allowedOrigins = [
+  "http://localhost:4000",         
+]
 dotenv.config();
 
 const requiredEnvVars = [
@@ -42,6 +46,25 @@ app.use("/api/files", fileRoutes);
 // app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 //   errorHandler(err, res);
 // });
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // allow server-to-server or Postman (no origin)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error("Not allowed by CORS"));
+    },
+    methods: ["GET", "POST", "DELETE"],
+  })
+);
+
+// Global rate limit
+const globalLimiter = rateLimit({
+  windowMs: 60 * 1000,  // 1 minute
+  max: 100,             // 100 requests per minute globally
+  message: "Too many requests, slow down."
+});
+app.use(globalLimiter);
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {

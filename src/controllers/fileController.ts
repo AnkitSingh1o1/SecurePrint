@@ -26,7 +26,6 @@ public async uploadFiles(req: Request, res: Response) {
     const uploadedKey = Object.keys(req.files)[0];
     const uploadedData = (req.files as any)[uploadedKey];
     const files = Array.isArray(uploadedData) ? uploadedData : [uploadedData];
-
     const uploadedFiles = await fileService.uploadFiles(files);
     return successResponse(res, uploadedFiles, 'Files uploaded successfully');
   } catch (err) {

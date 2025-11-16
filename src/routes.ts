@@ -1,3 +1,4 @@
+import rateLimit from 'express-rate-limit';
 import { FileController } from './controllers/fileController';
 import { Router } from "express";
 
@@ -5,7 +6,10 @@ const router = Router();
 
 const fileController = FileController.getInstance();
 
-// Upload
+//API Health
+router.get("/health", (_req, res) => {
+  res.status(200).json({ message: "SecurePrint API is running fine!" });
+});// Upload
 router.post("/upload", fileController.uploadFiles);
 
 // List all files (dev only, remove in prod)
@@ -31,7 +35,12 @@ router.get("/view/:token", fileController.viewUsingToken);
 router.get("/viewer/:token", fileController.viewerPage);
 
 // Secure PDF streaming (token consumed here)
-router.get("/secureStream", fileController.secureStream);
+const tokenLimiter = rateLimit({
+  windowMs: 60 * 1000,  // 1 minute
+  max: 10,              // ONLY 10 secureStreams per minute per IP
+  message: "Too many preview attempts. Please try again later."
+});
+router.get("/secureStream", tokenLimiter, fileController.secureStream);
 
 // Delete file
 router.delete("/:id", fileController.deleteFile);

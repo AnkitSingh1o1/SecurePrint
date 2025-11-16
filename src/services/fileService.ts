@@ -73,7 +73,10 @@ async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
       (extension && mime.lookup(extension)) ||
       file.mimetype ||
       "application/octet-stream";
-
+    
+      if (mimeType !== "application/pdf") {
+      throw new AppError("Only PDFs allowed", 400);
+    }
     //Safe S3 key generation
     const s3Key = `${uuidv4()}-${originalName}`;
 
