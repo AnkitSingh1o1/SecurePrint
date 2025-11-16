@@ -1,24 +1,29 @@
 import { v4 as uuidv4 } from 'uuid';
 import { FileRepository } from '../repositories/fileRepo';
 import { AppError } from '../utils/errorHandler';
-import { PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { s3Client, S3_BUCKET_NAME } from "../utils/s3Client";
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 import { FileRecord } from '../models/file';
 import mime from 'mime';
 import { UploadedFile } from "express-fileupload";
 import { PDFDocument, StandardFonts, rgb, degrees } from "pdf-lib";
-import { Readable } from "stream";
+import { Readable } from "node:stream";
 import { bodyToBuffer } from '../utils/streamUtils';
+import { TokenRepository } from '../repositories/tokenRepo';
 
+
+const TOKEN_TTL = Number(process.env.TOKEN_TTL_SECONDS || 600); // seconds
 export class FileService {
   private static instance: FileService;
   private readonly fileRepo: FileRepository;
+  private readonly tokenRepo: TokenRepository;
 
   private constructor() {
     this.fileRepo = FileRepository.getInstance();
+    this.tokenRepo = TokenRepository.getInstance();
   }
 
   public static getInstance(): FileService {
@@ -28,12 +33,12 @@ export class FileService {
     return FileService.instance;
   }
 
-  public saveUploadedFiles(files: Express.Multer.File[]) {
+  public async saveUploadedFiles(files: Express.Multer.File[]) {
     if (!files || files.length === 0) {
       throw new AppError('No files uploaded', 400);
     }
 
-    return files.map((file) => {
+    return files.map(async (file) => {
     const detectedMime = mime.lookup(file.originalname) || file.mimetype;
       const record = {
         id: uuidv4(),
@@ -43,7 +48,7 @@ export class FileService {
         path: file.path,
         uploadedAt: new Date(),
       };
-      return this.fileRepo.saveFile(record);
+      return await this.fileRepo.saveFile(record);
     });
   }
 
@@ -68,7 +73,10 @@ async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
       (extension && mime.lookup(extension)) ||
       file.mimetype ||
       "application/octet-stream";
-
+    
+      if (mimeType !== "application/pdf") {
+      throw new AppError("Only PDFs allowed", 400);
+    }
     //Safe S3 key generation
     const s3Key = `${uuidv4()}-${originalName}`;
 
@@ -79,6 +87,7 @@ async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
           Key: s3Key,
           Body: file.data, // express-fileupload provides Buffer here
           ContentType: mimeType,
+          ServerSideEncryption: "AES256",
         })
       );
 
@@ -91,7 +100,7 @@ async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
         uploadedAt: new Date(),
       };
 
-    this.fileRepo.saveFile(record);
+    await this.fileRepo.saveFile(record);
     savedFiles.push(record);
   }
 
@@ -100,12 +109,12 @@ async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
 
 
 
-  public getAllFiles() {
-    return this.fileRepo.getAllFiles();
+  public async getAllFiles() {
+    return await this.fileRepo.getAllFiles();
   }
 
-  public streamFile(fileId: string, res: any) {
-    const file = this.fileRepo.getFileById(fileId);
+  public async streamFile(fileId: string, res: any) {
+    const file = await this.fileRepo.getFileById(fileId);
     if (!file) {
       throw new AppError('File not found', 404);
     }
@@ -120,7 +129,7 @@ async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
   }
 
   async generateShareLink(fileId: string, expiresInSec = 600) {
-    const file = this.fileRepo.getFileById(fileId);
+    const file = await this.fileRepo.getFileById(fileId);
     if (!file) throw new AppError("File not found", 404);
 
     const command = new GetObjectCommand({
@@ -134,7 +143,7 @@ async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
 
     //Stream file directly from S3
   async streamFileFromS3(id: string) {
-    const file = this.fileRepo.getFileById(id);
+    const file = await this.fileRepo.getFileById(id);
     if (!file) return null;
 
     const command = new GetObjectCommand({
@@ -151,7 +160,7 @@ async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
 }
 
   async generateSignedUrl(id: string) {
-    const file = this.fileRepo.getFileById(id);
+    const file = await this.fileRepo.getFileById(id);
     if (!file) return null;
 
     const command = new GetObjectCommand({
@@ -163,7 +172,7 @@ async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
   }
 
   public async getWatermarkedPdfStream(id: string) {
-    const file = this.fileRepo.getFileById(id);
+    const file = await this.fileRepo.getFileById(id);
     if (!file) return null;
 
     const isPdf =
@@ -222,4 +231,81 @@ async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
       fileName: file.originalName,
     };
   }
+
+  public async generateOneTimeAccessLink(fileId: string) {
+        const file = await this.fileRepo.getFileById(fileId);
+        if (!file) return null;
+
+        const token = uuidv4();
+    await this.tokenRepo.save(token, fileId, TOKEN_TTL);
+
+    return `${process.env.BASE_URL || "http://localhost:4000"}/api/files/view/${token}`;
+  }
+
+  /**
+   * Atomically consume the token (GET+DEL) and return fileId or {valid:false, reason}
+   */
+    public async consumeOneTimeToken(token: string) {
+        const fileId = await this.tokenRepo.consume(token);
+    if (!fileId) {
+      return { valid: false, reason: "Invalid or expired token" };
+    }
+    //verify file exists
+    const file = await this.fileRepo.getFileById(fileId);
+    if (!file) {
+      return { valid: false, reason: "File not found" };
+    }
+    return { valid: true, fileId };
+  }
+
+    public async deleteFile(id: string) {
+  // Check from metadata
+  const file = await this.fileRepo.getFileById(id);
+  if (!file) {
+    return { success: false, message: "File not found" };
+  }
+
+  // 1. Delete from S3
+  await s3Client.send(
+    new DeleteObjectCommand({
+      Bucket: process.env.AWS_BUCKET_NAME!,
+      Key: file.s3Key,
+    })
+  );
+
+  // 2. Remove metadata
+  await this.fileRepo.deleteFileById(id);
+
+  return { success: true, message: "File deleted successfully" };
+}
+
+public async cleanupOldFiles(days: number) {
+  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  // Find old files
+  const oldFiles = await this.fileRepo.findOlderThan(cutoff);
+
+  let deleteCount = 0;
+
+  for (const file of oldFiles) {
+    try {
+      // Delete from S3
+      await s3Client.send(
+        new DeleteObjectCommand({
+          Bucket: process.env.AWS_BUCKET_NAME!,
+          Key: file.s3Key!,
+        })
+      );
+
+      // Delete from Mongo
+      await this.fileRepo.deleteById(file.id);
+      deleteCount++;
+    } catch (err) {
+      console.error("Failed to delete file:", file.id, err);
+    }
+  }
+
+  return deleteCount;
+}
+
 }
