@@ -3,6 +3,9 @@ import dotenv from "dotenv";
 import morgan from "morgan";
 import fileUpload from "express-fileupload";
 import fileRoutes from "./routes";
+import { connectDB } from "./configs/dbConfig";
+
+connectDB(); 
 
 dotenv.config();
 

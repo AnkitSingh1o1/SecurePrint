@@ -1,9 +1,7 @@
-import { FileRecord } from "../models/file";
+import { FileModel, FileRecord } from "../models/file";
 
 export class FileRepository {
   private static instance: FileRepository;
-  private readonly files: FileRecord[] = [];
-
   private constructor() {}
 
   public static getInstance(): FileRepository {
@@ -13,25 +11,27 @@ export class FileRepository {
     return FileRepository.instance;
   }
 
-  public saveFile(file: FileRecord) {
-    this.files.push(file);
-    return file;
+  async saveFile(file: FileRecord) {
+    return await FileModel.create({
+      id: file.id,
+      originalName: file.originalName,
+      mimeType: file.mimeType,
+      size: file.size,
+      path: file.path,
+      s3Key: file.s3Key,
+      uploadedAt: file.uploadedAt
+    });
   }
 
-  public getAllFiles() {
-    return this.files;
+  async getAllFiles() {
+    return await FileModel.find().lean();
   }
 
-  public getFileById(id: string) {
-    return this.files.find((f) => f.id === id);
+  async getFileById(id: string) {
+    return await FileModel.findOne({ id }).lean();
   }
 
-  public deleteFileById(id: string) {
-  const index = this.files.findIndex(f => f.id === id);
-  if (index !== -1) {
-    const deleted = this.files.splice(index, 1);
-    return deleted[0];
+  async deleteFileById(id: string) {
+    return await FileModel.findOneAndDelete({ id });
   }
-  return null;
-}
 }

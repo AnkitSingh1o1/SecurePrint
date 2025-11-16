@@ -31,12 +31,12 @@ export class FileService {
     return FileService.instance;
   }
 
-  public saveUploadedFiles(files: Express.Multer.File[]) {
+  public async saveUploadedFiles(files: Express.Multer.File[]) {
     if (!files || files.length === 0) {
       throw new AppError('No files uploaded', 400);
     }
 
-    return files.map((file) => {
+    return files.map(async (file) => {
     const detectedMime = mime.lookup(file.originalname) || file.mimetype;
       const record = {
         id: uuidv4(),
@@ -46,7 +46,7 @@ export class FileService {
         path: file.path,
         uploadedAt: new Date(),
       };
-      return this.fileRepo.saveFile(record);
+      return await this.fileRepo.saveFile(record);
     });
   }
 
@@ -94,7 +94,7 @@ async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
         uploadedAt: new Date(),
       };
 
-    this.fileRepo.saveFile(record);
+    await this.fileRepo.saveFile(record);
     savedFiles.push(record);
   }
 
@@ -103,12 +103,12 @@ async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
 
 
 
-  public getAllFiles() {
-    return this.fileRepo.getAllFiles();
+  public async getAllFiles() {
+    return await this.fileRepo.getAllFiles();
   }
 
-  public streamFile(fileId: string, res: any) {
-    const file = this.fileRepo.getFileById(fileId);
+  public async streamFile(fileId: string, res: any) {
+    const file = await this.fileRepo.getFileById(fileId);
     if (!file) {
       throw new AppError('File not found', 404);
     }
@@ -123,7 +123,7 @@ async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
   }
 
   async generateShareLink(fileId: string, expiresInSec = 600) {
-    const file = this.fileRepo.getFileById(fileId);
+    const file = await this.fileRepo.getFileById(fileId);
     if (!file) throw new AppError("File not found", 404);
 
     const command = new GetObjectCommand({
@@ -137,7 +137,7 @@ async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
 
     //Stream file directly from S3
   async streamFileFromS3(id: string) {
-    const file = this.fileRepo.getFileById(id);
+    const file = await this.fileRepo.getFileById(id);
     if (!file) return null;
 
     const command = new GetObjectCommand({
@@ -154,7 +154,7 @@ async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
 }
 
   async generateSignedUrl(id: string) {
-    const file = this.fileRepo.getFileById(id);
+    const file = await this.fileRepo.getFileById(id);
     if (!file) return null;
 
     const command = new GetObjectCommand({
@@ -166,7 +166,7 @@ async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
   }
 
   public async getWatermarkedPdfStream(id: string) {
-    const file = this.fileRepo.getFileById(id);
+    const file = await this.fileRepo.getFileById(id);
     if (!file) return null;
 
     const isPdf =
@@ -227,7 +227,7 @@ async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
   }
 
   public async generateOneTimeAccessLink(fileId: string) {
-        const file = this.fileRepo.getFileById(fileId);
+        const file = await this.fileRepo.getFileById(fileId);
         if (!file) return null;
 
         const token = uuidv4();
@@ -266,7 +266,7 @@ async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
 
     public async deleteFile(id: string) {
   // Check from metadata
-  const file = this.fileRepo.getFileById(id);
+  const file = await this.fileRepo.getFileById(id);
   if (!file) {
     return { success: false, message: "File not found" };
   }
@@ -280,7 +280,7 @@ async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
   );
 
   // 2. Remove metadata
-  this.fileRepo.deleteFileById(id);
+  await this.fileRepo.deleteFileById(id);
 
   return { success: true, message: "File deleted successfully" };
 }
