@@ -277,4 +277,34 @@ async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
 
   return { success: true, message: "File deleted successfully" };
 }
+
+public async cleanupOldFiles(days: number) {
+  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  // Find old files
+  const oldFiles = await this.fileRepo.findOlderThan(cutoff);
+
+  let deleteCount = 0;
+
+  for (const file of oldFiles) {
+    try {
+      // Delete from S3
+      await s3Client.send(
+        new DeleteObjectCommand({
+          Bucket: process.env.AWS_BUCKET_NAME!,
+          Key: file.s3Key!,
+        })
+      );
+
+      // Delete from Mongo
+      await this.fileRepo.deleteById(file.id);
+      deleteCount++;
+    } catch (err) {
+      console.error("Failed to delete file:", file.id, err);
+    }
+  }
+
+  return deleteCount;
+}
+
 }

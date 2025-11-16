@@ -34,4 +34,11 @@ export class FileRepository {
   async deleteFileById(id: string) {
     return await FileModel.findOneAndDelete({ id });
   }
+
+  async findOlderThan(date: Date) {
+  return FileModel.find({ uploadedAt: { $lt: date } });
+}
+async deleteById(id: string) {
+  return FileModel.deleteOne({ fileId: id });
+}
 }

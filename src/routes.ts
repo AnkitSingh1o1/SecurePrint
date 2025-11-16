@@ -9,14 +9,10 @@ const fileController = FileController.getInstance();
 //API Health
 router.get("/health", (_req, res) => {
   res.status(200).json({ message: "SecurePrint API is running fine!" });
-});// Upload
+});
+
+// Upload
 router.post("/upload", fileController.uploadFiles);
-
-// List all files (dev only, remove in prod)
-router.get("/", fileController.listFiles);
-
-// Preview (dev use only)
-router.get("/:id/preview", fileController.previewFile);
 
 // Generate one time access link
 router.get("/:id/access", fileController.generateAccessLink);
@@ -48,5 +44,9 @@ router.delete("/:id", fileController.deleteFile);
 //Unsafe-OnlyForDev
 // router.get('/:id/stream', fileController.streamFile);
 // router.get("/:id/share", fileController.generateShareLink);
+// List all files (dev only, remove in prod)
+//router.get("/", fileController.listFiles);
+// Preview (dev use only)
+//router.get("/:id/preview", fileController.previewFile);
 
 export default router;

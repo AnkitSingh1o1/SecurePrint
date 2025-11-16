@@ -7,7 +7,9 @@ import { connectDB } from "./configs/dbConfig";
 import { testRedisConnection } from "./configs/redisClient";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
+import { scheduleCleanup } from "./cron/cleanup";
 
+scheduleCleanup();
 connectDB(); 
 const allowedOrigins = [
   "http://localhost:4000",         
