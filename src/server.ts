@@ -8,6 +8,7 @@ import { testRedisConnection } from "./configs/redisClient";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import { scheduleCleanup } from "./cron/cleanup";
+import { enforceHTTPS } from "./middleware/httpsRedirect";
 
 scheduleCleanup();
 connectDB(); 
@@ -36,9 +37,15 @@ app.use(express.urlencoded({ extended: true }));
 app.use(fileUpload());
 app.use(morgan("dev"));
 
+// Redirect HTTP → HTTPS in production
+app.use(enforceHTTPS);
+
+// Trust reverse proxy (necessary for x-forwarded-proto to work)
+app.set("trust proxy", 1);
+
 // Health check route
 app.get("/", (_req: Request, res: Response) => {
-  res.status(200).json({ message: "✅ SecurePrint API is running fine!" });
+  res.status(200).json({ message: "SecurePrint API is running fine!" });
 });
 
 // File-related routes

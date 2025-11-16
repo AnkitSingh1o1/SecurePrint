@@ -87,6 +87,7 @@ async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
           Key: s3Key,
           Body: file.data, // express-fileupload provides Buffer here
           ContentType: mimeType,
+          ServerSideEncryption: "AES256",
         })
       );
 

@@ -6,11 +6,6 @@ const router = Router();
 
 const fileController = FileController.getInstance();
 
-//API Health
-router.get("/health", (_req, res) => {
-  res.status(200).json({ message: "SecurePrint API is running fine!" });
-});
-
 // Upload
 router.post("/upload", fileController.uploadFiles);
 
