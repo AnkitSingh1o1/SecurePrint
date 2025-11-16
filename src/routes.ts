@@ -18,9 +18,16 @@ router.get("/:id/preview", fileController.previewFile);
 router.get("/:id/access", fileController.generateAccessLink);
 
 // Shopkeeper visits this
+// clean, simple, user-friendly link to share.
+// Think of it as a "front door".
 router.get("/view/:token", fileController.viewUsingToken);
 
 // Viewer HTML page
+// HTML page in between for:
+// PDF display
+// buttons
+// watermark UI
+//later: prevent screenshot, blur, CSS overlays, warnings, instructions, ads, etc.
 router.get("/viewer/:token", fileController.viewerPage);
 
 // Secure PDF streaming (token consumed here)
