@@ -14,6 +14,8 @@ import { Readable } from "node:stream";
 import { bodyToBuffer } from '../utils/streamUtils';
 import { TokenRepository } from '../repositories/tokenRepo';
 
+
+const TOKEN_TTL = Number(process.env.TOKEN_TTL_SECONDS || 600); // seconds
 export class FileService {
   private static instance: FileService;
   private readonly fileRepo: FileRepository;
@@ -231,38 +233,26 @@ async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
         if (!file) return null;
 
         const token = uuidv4();
-        const createdAt = new Date();
-        const expiresAt = new Date(createdAt.getTime() + 10 * 60 * 1000); // 10 minutes
+    await this.tokenRepo.save(token, fileId, TOKEN_TTL);
 
-        this.tokenRepo.saveToken({
-            token,
-            fileId,
-            createdAt: createdAt.toISOString(),
-            expiresAt: expiresAt.toISOString(),
-            used: false
-        });
+    return `${process.env.BASE_URL || "http://localhost:4000"}/api/files/view/${token}`;
+  }
 
-        return `${process.env.BASE_URL || "http://localhost:4000"}/api/files/view/${token}`;
-    }
-
+  /**
+   * Atomically consume the token (GET+DEL) and return fileId or {valid:false, reason}
+   */
     public async consumeOneTimeToken(token: string) {
-        const record = this.tokenRepo.getToken(token);
-        if (!record) return { valid: false, reason: "Invalid token" };
-
-        if (record.used) {
-            return { valid: false, reason: "Token already used" };
-        }
-
-        const now = new Date();
-        if (now > new Date(record.expiresAt)) {
-            return { valid: false, reason: "Token expired" };
-        }
-
-        // Valid token → mark used
-        this.tokenRepo.markUsed(token);
-
-        return { valid: true, fileId: record.fileId };
+        const fileId = await this.tokenRepo.consume(token);
+    if (!fileId) {
+      return { valid: false, reason: "Invalid or expired token" };
     }
+    //verify file exists
+    const file = await this.fileRepo.getFileById(fileId);
+    if (!file) {
+      return { valid: false, reason: "File not found" };
+    }
+    return { valid: true, fileId };
+  }
 
     public async deleteFile(id: string) {
   // Check from metadata

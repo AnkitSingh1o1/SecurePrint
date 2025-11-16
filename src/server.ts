@@ -4,6 +4,7 @@ import morgan from "morgan";
 import fileUpload from "express-fileupload";
 import fileRoutes from "./routes";
 import { connectDB } from "./configs/dbConfig";
+import { testRedisConnection } from "./configs/redisClient";
 
 connectDB(); 
 
@@ -44,8 +45,10 @@ app.use("/api/files", fileRoutes);
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
-  console.log(`🚀 SecurePrint backend running on port ${PORT}`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
+  console.log(`:: SecurePrint backend running on port ${PORT}`);
+  console.log(`:: Environment: ${process.env.NODE_ENV || "development"}`);
 });
+
+testRedisConnection();
 
 export default app;

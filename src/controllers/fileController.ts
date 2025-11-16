@@ -129,19 +129,22 @@ public async uploadFiles(req: Request, res: Response) {
   }
 }
 
-  public async viewUsingToken(req: Request, res: Response) {
+public async secureStream(req: Request, res: Response) {
   try {
-    const { token } = req.params;
+    const token = (req.query.token as string) || (req.params.token);
+    if (!token) {
+      return res.status(400).json({ success: false, message: "Token missing" });
+    }
 
+    // Consume token via Redis (ONE-TIME)
     const result = await fileService.consumeOneTimeToken(token);
-
     if (!result.valid) {
       return res.status(400).json({ success: false, message: result.reason });
     }
 
     const fileId = result.fileId;
-    if(!fileId){
-      return res.status(400).json({ success: false, message: result.reason });
+    if (!fileId) {
+      return res.status(400).json({ success: false, message: "Token does not reference a file" });
     }
 
     const previewResult = await fileService.getWatermarkedPdfStream(fileId);
@@ -155,9 +158,27 @@ public async uploadFiles(req: Request, res: Response) {
     previewResult.stream.pipe(res);
 
   } catch (err: any) {
-    console.error("Token preview error:", err);
+    console.error("secureStream error:", err);
     return res.status(500).json({ success: false, message: err.message });
   }
+}
+
+public async viewUsingToken(req: Request, res: Response) {
+  try {
+    const { token } = req.params;
+
+    return res.redirect(`/api/files/viewer/${token}`);
+
+  } catch (err: any) {
+    console.error("viewUsingToken error:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+}
+
+
+public async viewerPage(req: Request, res: Response) {
+  const filePath = require("node:path").join(__dirname, "../public/pdf-viewer.html");
+  return res.sendFile(filePath);
 }
 
 public async deleteFile(req: Request, res: Response) {

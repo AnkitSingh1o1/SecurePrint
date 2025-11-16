@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SecurePrint Viewer</title>
+  <meta charset="UTF-8" />
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #1a1a1a;
+    }
+    iframe {
+      width: 100vw;
+      height: 100vh;
+      border: none;
+    }
+  </style>
+</head>
+<body>
+
+<h3 style="color:white; padding:10px; font-family:sans-serif;">Loading secure preview...</h3>
+
+<script>
+  const token = window.location.pathname.split("/").pop();
+  const iframeUrl = `/api/files/secureStream?token=${encodeURIComponent(token)}`;
+  
+  const iframe = document.createElement("iframe");
+  iframe.src = iframeUrl;
+
+  document.body.innerHTML = "";
+  document.body.appendChild(iframe);
+</script>
+
+</body>
+</html>
