@@ -6,6 +6,12 @@ const router = Router();
 
 const fileController = FileController.getInstance();
 
+const viewLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 20,             // max 20 requests per minute per IP
+  message: "Too many attempts. Please slow down.",
+});
+
 // Upload
 router.post("/upload", fileController.uploadFiles);
 
@@ -15,7 +21,7 @@ router.get("/:id/access", fileController.generateAccessLink);
 // Shopkeeper visits this
 // clean, simple, user-friendly link to share.
 // Think of it as a "front door".
-router.get("/view/:token", fileController.viewUsingToken);
+router.get("/view/:token", viewLimiter, fileController.viewUsingToken);
 
 // Viewer HTML page
 // HTML page in between for:
@@ -23,7 +29,7 @@ router.get("/view/:token", fileController.viewUsingToken);
 // buttons
 // watermark UI
 //later: prevent screenshot, blur, CSS overlays, warnings, instructions, ads, etc.
-router.get("/viewer/:token", fileController.viewerPage);
+router.get("/viewer/:token", viewLimiter, fileController.viewerPage);
 
 // Secure PDF streaming (token consumed here)
 const tokenLimiter = rateLimit({
@@ -31,7 +37,7 @@ const tokenLimiter = rateLimit({
   max: 10,              // ONLY 10 secureStreams per minute per IP
   message: "Too many preview attempts. Please try again later."
 });
-router.get("/secureStream", tokenLimiter, fileController.secureStream);
+router.get("/secureStream", viewLimiter, tokenLimiter, fileController.secureStream);
 
 // Delete file
 router.delete("/:id", fileController.deleteFile);

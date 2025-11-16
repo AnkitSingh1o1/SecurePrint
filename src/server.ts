@@ -9,8 +9,8 @@ import cors from "cors";
 import rateLimit from "express-rate-limit";
 import { scheduleCleanup } from "./cron/cleanup";
 import { enforceHTTPS } from "./middleware/httpsRedirect";
+import { globalErrorHandler } from "./middleware/errorHandler";
 
-scheduleCleanup();
 connectDB(); 
 const allowedOrigins = [
   "http://localhost:4000",         
@@ -43,6 +43,27 @@ app.use(enforceHTTPS);
 // Trust reverse proxy (necessary for x-forwarded-proto to work)
 app.set("trust proxy", 1);
 
+// Remove Express signature
+app.disable("x-powered-by");
+
+// Prevent MIME sniffing
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  next();
+});
+
+// Prevent your viewer from being embedded elsewhere (clickjacking)
+app.use((req, res, next) => {
+  res.setHeader("X-Frame-Options", "DENY");
+  next();
+});
+
+// Prevent small-scale XSS attacks
+app.use((req, res, next) => {
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  next();
+});
+
 // Health check route
 app.get("/", (_req: Request, res: Response) => {
   res.status(200).json({ message: "SecurePrint API is running fine!" });
@@ -52,9 +73,8 @@ app.get("/", (_req: Request, res: Response) => {
 app.use("/api/files", fileRoutes);
 
 // Global error handler
-// app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-//   errorHandler(err, res);
-// });
+app.use(globalErrorHandler);
+
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -82,5 +102,6 @@ app.listen(PORT, () => {
 });
 
 testRedisConnection();
+scheduleCleanup();
 
 export default app;
