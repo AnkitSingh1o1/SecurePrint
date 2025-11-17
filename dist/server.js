@@ -8,6 +8,17 @@ const dotenv_1 = __importDefault(require("dotenv"));
 const morgan_1 = __importDefault(require("morgan"));
 const express_fileupload_1 = __importDefault(require("express-fileupload"));
 const routes_1 = __importDefault(require("./routes"));
+const dbConfig_1 = require("./configs/dbConfig");
+const redisClient_1 = require("./configs/redisClient");
+const cors_1 = __importDefault(require("cors"));
+const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
+const cleanup_1 = require("./cron/cleanup");
+const httpsRedirect_1 = require("./middleware/httpsRedirect");
+const errorHandler_1 = require("./middleware/errorHandler");
+(0, dbConfig_1.connectDB)();
+const allowedOrigins = [
+    "http://localhost:4000",
+];
 dotenv_1.default.config();
 const requiredEnvVars = [
     "AWS_REGION",
@@ -26,19 +37,58 @@ app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
 app.use((0, express_fileupload_1.default)());
 app.use((0, morgan_1.default)("dev"));
+// Redirect HTTP → HTTPS in production
+app.use(httpsRedirect_1.enforceHTTPS);
+// Trust reverse proxy (necessary for x-forwarded-proto to work)
+app.set("trust proxy", 1);
+// Remove Express signature
+app.disable("x-powered-by");
+// Prevent MIME sniffing
+app.use((req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    next();
+});
+// Prevent your viewer from being embedded elsewhere (clickjacking)
+app.use((req, res, next) => {
+    res.setHeader("X-Frame-Options", "DENY");
+    next();
+});
+// Prevent small-scale XSS attacks
+app.use((req, res, next) => {
+    res.setHeader("X-XSS-Protection", "1; mode=block");
+    next();
+});
 // Health check route
 app.get("/", (_req, res) => {
-    res.status(200).json({ message: "✅ SecurePrint API is running fine!" });
+    res.status(200).json({ message: "SecurePrint API is running fine!" });
 });
 // File-related routes
 app.use("/api/files", routes_1.default);
 // Global error handler
-// app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-//   errorHandler(err, res);
-// });
+app.use(errorHandler_1.globalErrorHandler);
+app.use((0, cors_1.default)({
+    origin: function (origin, callback) {
+        // allow server-to-server or Postman (no origin)
+        if (!origin)
+            return callback(null, true);
+        if (allowedOrigins.includes(origin))
+            return callback(null, true);
+        return callback(new Error("Not allowed by CORS"));
+    },
+    methods: ["GET", "POST", "DELETE"],
+}));
+// Global rate limit
+const globalLimiter = (0, express_rate_limit_1.default)({
+    windowMs: 60 * 1000, // 1 minute
+    max: 100, // 100 requests per minute globally
+    message: "Too many requests, slow down."
+});
+app.use(globalLimiter);
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
-    console.log(`🚀 SecurePrint backend running on port ${PORT}`);
-    console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
+    console.log(`:: SecurePrint backend running on port ${PORT}`);
+    console.log(`:: Environment: ${process.env.NODE_ENV || "development"}`);
 });
+(0, redisClient_1.testRedisConnection)();
+(0, cleanup_1.scheduleCleanup)();
 exports.default = app;
