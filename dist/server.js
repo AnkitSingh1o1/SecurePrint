@@ -15,12 +15,13 @@ const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const cleanup_1 = require("./cron/cleanup");
 const httpsRedirect_1 = require("./middleware/httpsRedirect");
 const errorHandler_1 = require("./middleware/errorHandler");
+dotenv_1.default.config();
 (0, dbConfig_1.connectDB)();
 const allowedOrigins = [
-    "http://localhost:4000",
-    "https://secureprint-19d4.onrender.com",
+    "http://localhost:3000", // Frontend local
+    "https://secureprint-frontend.vercel.app", // Frontend prod
+    "https://secureprint-19d4.onrender.com" // Backend URL
 ];
-dotenv_1.default.config();
 const requiredEnvVars = [
     "AWS_REGION",
     "AWS_ACCESS_KEY_ID",
@@ -38,11 +39,25 @@ app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
 app.use((0, express_fileupload_1.default)());
 app.use((0, morgan_1.default)("dev"));
+//CORS
+app.use((0, cors_1.default)({
+    origin: function (origin, callback) {
+        if (!origin)
+            return callback(null, true); // allow Postman, server-to-server
+        if (allowedOrigins.includes(origin))
+            return callback(null, true);
+        return callback(new Error("Not allowed by CORS"));
+    },
+    methods: ["GET", "POST", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+}));
+// Allow preflight
+app.options("*", (0, cors_1.default)());
 // Redirect HTTP → HTTPS in production
 app.use(httpsRedirect_1.enforceHTTPS);
-// Trust reverse proxy (necessary for x-forwarded-proto to work)
+// Trust reverse proxy (needed for HTTPS redirects)
 app.set("trust proxy", 1);
-// Remove Express signature
+// Security headers
 app.disable("x-powered-by");
 // Prevent MIME sniffing
 app.use((req, res, next) => {
@@ -67,17 +82,6 @@ app.get("/", (_req, res) => {
 app.use("/api/files", routes_1.default);
 // Global error handler
 app.use(errorHandler_1.globalErrorHandler);
-app.use((0, cors_1.default)({
-    origin: function (origin, callback) {
-        // allow server-to-server or Postman (no origin)
-        if (!origin)
-            return callback(null, true);
-        if (allowedOrigins.includes(origin))
-            return callback(null, true);
-        return callback(new Error("Not allowed by CORS"));
-    },
-    methods: ["GET", "POST", "DELETE"],
-}));
 // Global rate limit
 const globalLimiter = (0, express_rate_limit_1.default)({
     windowMs: 60 * 1000, // 1 minute

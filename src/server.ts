@@ -11,12 +11,14 @@ import { scheduleCleanup } from "./cron/cleanup";
 import { enforceHTTPS } from "./middleware/httpsRedirect";
 import { globalErrorHandler } from "./middleware/errorHandler";
 
-connectDB(); 
-const allowedOrigins = [
-  "http://localhost:4000",
-  "https://secureprint-19d4.onrender.com",         
-]
 dotenv.config();
+connectDB();
+
+const allowedOrigins = [
+  "http://localhost:3000",                 // Frontend local
+  "https://secureprint-frontend.vercel.app", // Frontend prod
+  "https://secureprint-19d4.onrender.com" // Backend URL
+];
 
 const requiredEnvVars = [
   "AWS_REGION",
@@ -38,13 +40,29 @@ app.use(express.urlencoded({ extended: true }));
 app.use(fileUpload());
 app.use(morgan("dev"));
 
+//CORS
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true); // allow Postman, server-to-server
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error("Not allowed by CORS"));
+    },
+    methods: ["GET", "POST", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
+// Allow preflight
+app.options("*", cors());
+
 // Redirect HTTP → HTTPS in production
 app.use(enforceHTTPS);
 
-// Trust reverse proxy (necessary for x-forwarded-proto to work)
+// Trust reverse proxy (needed for HTTPS redirects)
 app.set("trust proxy", 1);
 
-// Remove Express signature
+// Security headers
 app.disable("x-powered-by");
 
 // Prevent MIME sniffing
@@ -75,18 +93,6 @@ app.use("/api/files", fileRoutes);
 
 // Global error handler
 app.use(globalErrorHandler);
-
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // allow server-to-server or Postman (no origin)
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error("Not allowed by CORS"));
-    },
-    methods: ["GET", "POST", "DELETE"],
-  })
-);
 
 // Global rate limit
 const globalLimiter = rateLimit({
