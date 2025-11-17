@@ -13,7 +13,8 @@ import { globalErrorHandler } from "./middleware/errorHandler";
 
 connectDB(); 
 const allowedOrigins = [
-  "http://localhost:4000",         
+  "http://localhost:4000",
+  "https://secureprint-19d4.onrender.com",         
 ]
 dotenv.config();
 
@@ -53,10 +54,10 @@ app.use((req, res, next) => {
 });
 
 // Prevent your viewer from being embedded elsewhere (clickjacking)
-app.use((req, res, next) => {
-  res.setHeader("X-Frame-Options", "DENY");
-  next();
-});
+// app.use((req, res, next) => {
+//   res.setHeader("X-Frame-Options", "DENY");
+//   next();
+// });
 
 // Prevent small-scale XSS attacks
 app.use((req, res, next) => {
