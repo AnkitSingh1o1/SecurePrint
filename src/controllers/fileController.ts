@@ -176,8 +176,26 @@ public async viewUsingToken(req: Request, res: Response) {
 
 
 public async viewerPage(req: Request, res: Response) {
-  const filePath = require("node:path").join(__dirname, "../public/pdf-viewer.html");
-  return res.sendFile(filePath);
+  const token = req.params.token;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Secure PDF Viewer</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body { margin: 0; padding: 0; }
+          iframe { width: 100%; height: 100vh; border: none; }
+        </style>
+      </head>
+      <body>
+        <iframe src="/api/files/secureStream?token=${token}"></iframe>
+      </body>
+    </html>
+  `;
+
+  return res.send(html);
 }
 
 public async deleteFile(req: Request, res: Response) {

@@ -201,7 +201,8 @@ class FileService {
             return null;
         const token = (0, uuid_1.v4)();
         await this.tokenRepo.save(token, fileId, TOKEN_TTL);
-        return `${process.env.BASE_URL || "http://localhost:4000"}/api/files/view/${token}`;
+        const baseUrl = process.env.BASE_URL || `http://localhost:4000`;
+        return `${baseUrl}/api/files/view/${token}`;
     }
     /**
      * Atomically consume the token (GET+DEL) and return fileId or {valid:false, reason}

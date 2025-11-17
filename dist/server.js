@@ -18,6 +18,7 @@ const errorHandler_1 = require("./middleware/errorHandler");
 (0, dbConfig_1.connectDB)();
 const allowedOrigins = [
     "http://localhost:4000",
+    "https://secureprint-19d4.onrender.com",
 ];
 dotenv_1.default.config();
 const requiredEnvVars = [
@@ -49,10 +50,10 @@ app.use((req, res, next) => {
     next();
 });
 // Prevent your viewer from being embedded elsewhere (clickjacking)
-app.use((req, res, next) => {
-    res.setHeader("X-Frame-Options", "DENY");
-    next();
-});
+// app.use((req, res, next) => {
+//   res.setHeader("X-Frame-Options", "DENY");
+//   next();
+// });
 // Prevent small-scale XSS attacks
 app.use((req, res, next) => {
     res.setHeader("X-XSS-Protection", "1; mode=block");
