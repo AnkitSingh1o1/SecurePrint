@@ -19,7 +19,7 @@ dotenv_1.default.config();
 (0, dbConfig_1.connectDB)();
 const allowedOrigins = [
     "http://localhost:3000", // Frontend local
-    "https://secureprint-frontend.vercel.app", // Frontend prod
+    "https://secure-print-frontend.vercel.app", // Frontend prod
     "https://secureprint-19d4.onrender.com" // Backend URL
 ];
 const requiredEnvVars = [
@@ -34,12 +34,6 @@ for (const key of requiredEnvVars) {
     }
 }
 const app = (0, express_1.default)();
-// Core middlewares
-app.use(express_1.default.json());
-app.use(express_1.default.urlencoded({ extended: true }));
-app.use((0, express_fileupload_1.default)());
-app.use((0, morgan_1.default)("dev"));
-//CORS
 app.use((0, cors_1.default)({
     origin: function (origin, callback) {
         if (!origin)
@@ -50,10 +44,14 @@ app.use((0, cors_1.default)({
     },
     methods: ["GET", "POST", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
 }));
 // Allow preflight
 app.options("*", (0, cors_1.default)());
-// Redirect HTTP → HTTPS in production
+app.use(express_1.default.json());
+app.use(express_1.default.urlencoded({ extended: true }));
+app.use((0, express_fileupload_1.default)());
+app.use((0, morgan_1.default)("dev"));
 app.use(httpsRedirect_1.enforceHTTPS);
 // Trust reverse proxy (needed for HTTPS redirects)
 app.set("trust proxy", 1);
