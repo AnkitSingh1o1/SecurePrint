@@ -34,13 +34,6 @@ for (const key of requiredEnvVars) {
 
 const app: Application = express();
 
-// Core middlewares
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(fileUpload());
-app.use(morgan("dev"));
-
-//CORS
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -50,13 +43,17 @@ app.use(
     },
     methods: ["GET", "POST", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
   })
 );
 
 // Allow preflight
 app.options("*", cors());
 
-// Redirect HTTP → HTTPS in production
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(fileUpload());
+app.use(morgan("dev"));
 app.use(enforceHTTPS);
 
 // Trust reverse proxy (needed for HTTPS redirects)
