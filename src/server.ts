@@ -16,7 +16,7 @@ connectDB();
 
 const allowedOrigins = [
   "http://localhost:3000",                 // Frontend local
-  "https://secureprint-frontend.vercel.app", // Frontend prod
+  "https://secure-print-frontend.vercel.app", // Frontend prod
   "https://secureprint-19d4.onrender.com" // Backend URL
 ];
 
