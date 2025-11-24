@@ -9,9 +9,8 @@ import path from 'node:path';
 import { FileRecord } from '../models/file';
 import mime from 'mime';
 import { UploadedFile } from "express-fileupload";
-import { PDFDocument, StandardFonts, rgb, degrees } from "pdf-lib";
 import { Readable } from "node:stream";
-import { bodyToBuffer } from '../utils/streamUtils';
+import { toNodeReadable } from '../utils/streamUtils';
 import { TokenRepository } from '../repositories/tokenRepo';
 
 
@@ -190,43 +189,10 @@ async uploadFiles(files: UploadedFile[]): Promise<FileRecord[]> {
     const s3Response = await s3Client.send(command);
     if (!s3Response.Body) return null;
 
-    const pdfBuf = await bodyToBuffer(s3Response.Body);
-
-    //Load the PDF and apply watermark
-    const pdfDoc = await PDFDocument.load(pdfBuf, { ignoreEncryption: true });
-    const pages = pdfDoc.getPages();
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-
-    const watermark = "SECURE PRINT • DO NOT COPY";
-    const fontSize = 48;
-    const opacity = 0.15;
-
-    for (const page of pages) {
-      const { width, height } = page.getSize();
-      const rotate = degrees(-60);
-
-      const tileGapX = 300;
-      const tileGapY = 200;
-
-      for (let x = -width; x < width * 2; x += tileGapX) {
-        for (let y = 0; y < height * 2; y += tileGapY) {
-          page.drawText(watermark, {
-            x,
-            y,
-            size: fontSize,
-            font,
-            color: rgb(1, 0, 0),
-            rotate,
-            opacity,
-          });
-        }
-      }
-    }
-    const modifiedBytes = await pdfDoc.save();
-    const buffer = Buffer.from(modifiedBytes);
-    const outStream = Readable.from(buffer);
+    // Return original PDF stream without watermark
+    const nodeStream = await toNodeReadable(s3Response.Body);
     return {
-      stream: outStream,
+      stream: nodeStream,
       contentType: "application/pdf",
       fileName: file.originalName,
     };
